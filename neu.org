@@ -1,0 +1,1027 @@
+* FEEDBACK Todo liste
+Hallo Mandy!
+Hoffe, du genießt gerade die Sonne. Hier das, was wir heute besprochen haben zur Datenauswertung Muko-Diabetes:
+
+** TODO Vergleich von Gruppen (für Zeitpunkte -3; -2; -1; 0; 1; 2; 3 Jahre nach Diagnosezeitpunkt):
+   - grafiken gemacht (_geht nur fuer gematchte_)
+** TODO Diabetes-Kinder vs. Matched je für 3 Untergruppen (männlich gegen männlich, weiblich gegen weiblich, mixed gegen mixed): 
+** TODO Körpergröße-SDS 
+   - (dabei einmal die Messwerte als am nächsten um den Jahresabstand zum Diagnosezeitpunkt, 
+   - einmal als Median aus den 12 Monaten um Jahresabstand zum Diagnosezeitpunkt); 
+** TODO Körpergewicht-SDS (gleich wie bei Körpergröße vorgehen); 
+** TODO BMI-SDS (ebenfalls gleich); Körpergrößenwachstum-SDS (aus den Körpergrößen berechnen, dabei kommen natürlich nur 6 "Messzeitpunkte" heraus); 
+
+** TODO FEV1-SDS (aus Formel von www.lungfunction.org ermittelt aus arithm. Mittelwert der 12 Monate um Messzeitpunkt herum); 
+** TODO MEF25=FEF75 (gleich wie bei FEV1-SDS); IVC (mit den Absolutwerten, nicht SDS, ansonsten ebenfalls wie bei FEV1-SDS).
+** TODO "Perzentilenkurven", einmal für Diabetes-Patienten, soweit möglich, dies vs. alle Mukoviszidose-Patienten; für die Messwerte Körpergröße, Körpergewicht, BMI und Wachstumsgeschwindigkeit; evt. auch als SDS-Scores.
+
+ Das wäre so das Wichtigste erst einmal.
+
+ Wenn du Probleme hast: 26818! oder per Mail.
+ Danke dir,
+ Nicolas
+
+* [2015-03-11 Mi] data cleaning
+#+BEGIN_SRC R :session
+  setwd("/media/mvogel/Volume/transcend/doktoranden/steighardt/neu/")
+  wb <- loadWorkbook("auxo.xls")
+  auxo <- readWorksheet(wb,1)
+
+
+  auxo$week <- isoweek(auxo$Datum)
+  auxo$year <- year(auxo$Datum)
+
+
+  auxo$missings <- apply(auxo,1,function(x) sum(is.na(x)))
+
+  require(dplyr)
+  auxo <- auxo %>% group_by(Personennr,year,week) %>% mutate(min.miss=min(missings))
+
+  auxo <- auxo[auxo$missings==auxo$min.miss,]
+
+
+  wb2 <- loadWorkbook("lufu.xls")
+  lufu <- readWorksheet(wb2,1,endRow = 2828)
+
+
+  lufu$Eintragsdatum[grep("-",lufu$Eintragsdatum)] <-
+      paste(substr(lufu$Eintragsdatum[grep("-",lufu$Eintragsdatum)],9,10),
+            substr(lufu$Eintragsdatum[grep("-",lufu$Eintragsdatum)],6,7),
+            substr(lufu$Eintragsdatum[grep("-",lufu$Eintragsdatum)],1,4),sep = ".")
+
+
+  require(lubridate)
+  lufu$Eintragsdatum <- dmy(lufu$Eintragsdatum)
+
+  lufu$Geburtsdatum.. <- dmy(lufu$Geburtsdatum..)
+
+  lufu$Alter.bei.Eintrag <- as.numeric(lufu$Eintragsdatum - lufu$Geburtsdatum..)/365.25/3600/24
+
+  names(lufu) <- c("patnrmd","lufudatum","name","vorname","gebdat","lufualter","fev1","ivc.l","mef25")
+
+  lufu$fev1 <- as.numeric(gsub(",",".",as.character(lufu$fev1)))
+
+  lufu$missings <- apply(lufu,1,function(x) sum(is.na(x)))
+
+  lufu <- lufu[lufu$missings < 3,]
+
+
+  ## auxo$Datum <- as.Date(auxo$Datum)
+  lufu$lufudatum <- as.Date(lufu$lufudatum)
+
+  lufu$gebdat <- as.Date(lufu$gebdat)
+  ## auxo$GebDat <- as.Date(auxo$GebDat)
+
+  lufu$name <- tolower(lufu$name)
+  lufu$vorname <- tolower(lufu$vorname)
+
+  lufu$name <- gsub("ä","ae",lufu$name)
+  lufu$vorname <- gsub("ä","ae",lufu$vorname)
+  lufu$vorname <- gsub("ß","ss",lufu$vorname)
+  lufu$name <- gsub("ß","ss",lufu$name)
+  lufu$vorname <- gsub(" $","",lufu$vorname)
+  lufu$name <- gsub(" $","",lufu$name)
+  lufu$name <- gsub("wolffersdorff von","wolffersdorff",lufu$name)
+  lufu$name <- gsub("capelle-berthold","capelle",lufu$name)
+
+  lufu$vorname <- gsub("vinzent","vincent",lufu$vorname)
+  lufu$vorname <- gsub("sarah-michelle krüger","sarah michelle krüger",lufu$vorname)
+  lufu$vorname <- gsub("paul philipp","paul philip",lufu$vorname)
+  lufu$name <- gsub("herber (oehmichen)","oehmichen",lufu$name)
+  lufu$vorname <- gsub("finn kai","finn",lufu$vorname)
+  lufu$vorname <- gsub("jakob vivian","jakob",lufu$vorname)
+  lufu$vorname <- gsub("-"," ",lufu$vorname)
+
+
+
+
+  auxo$Vorname <- tolower(auxo$Vorname)
+  auxo$Nachname <- tolower(auxo$Nachname)
+
+
+  auxo$Vorname <- gsub("ä","ae",auxo$Vorname)
+  auxo$Vorname <- gsub("ß","ss",auxo$Vorname)
+  auxo$Vorname <- gsub("vinzent","vincent",auxo$Vorname)
+  auxo$Vorname <- gsub("sarah-michelle krüger","sarah michelle krüger",auxo$Vorname)
+  auxo$Vorname <- gsub("paul philipp","paul philip",auxo$Vorname)
+  auxo$Vorname <- gsub("finn kai","finn",auxo$Vorname)
+  auxo$Vorname <- gsub("jakob vivian","jakob",auxo$Vorname)
+  auxo$Vorname <- gsub("-"," ",auxo$Vorname)
+  auxo$Vorname <- gsub(" $","",auxo$Vorname)
+
+
+  auxo$Nachname <- gsub("ä","ae",auxo$Nachname)
+  auxo$Nachname <- gsub("ß","ss",auxo$Nachname)
+  auxo$Nachname <- gsub(" $","",auxo$Nachname)
+  auxo$Nachname <- gsub("wolffersdorff von","wolffersdorff",auxo$Nachname)
+  auxo$Nachname <- gsub("capelle-berthold","capelle",auxo$Nachname)
+  auxo$Nachname <- gsub("herber .oehmichen.","oehmichen",auxo$Nachname)
+
+
+
+  auxo$gebyear <- year(auxo$GebDat)
+  lufu$gebyear <- year(lufu$gebdat)
+
+  auxo$gebmonth <- month(auxo$GebDat)
+  lufu$gebmonth <- month(lufu$gebdat)
+
+
+  auxo$gebweek <- isoweek(auxo$GebDat)
+  lufu$gebweek <- isoweek(lufu$gebdat)
+
+  auxo <- as.data.frame(auxo)
+
+  lufu$week <- isoweek(lufu$lufudatum)
+  lufu$year <- year(lufu$lufudatum)
+
+  data <- merge(lufu,auxo,
+                by.x = c("vorname","gebyear","gebmonth","week","year"),
+                by.y = c("Vorname","gebyear","gebmonth","week","year"),all=T)
+
+  data$gebdat <- as.Date(data$gebdat)
+  data <- data[order(data$vorname,data$name,data$year,data$week),]
+
+  data$name <- ifelse(is.na(data$name),data$Nachname,data$name)
+
+  data.l <- split(data,paste(data$vorname,data$gebyear,data$gebmonth))
+  lapply(data.l,function(x) paste(unique(x$vorname[!is.na(x$vorname)]),
+                                  unique(x$Nachname[!is.na(x$Nachname)]),unique(x$name[!is.na(x$name)])))
+
+
+  ## wbneu <- loadWorkbook("201503daten.xlsx",create=T)
+  ## createSheet(wbneu,"data")
+  ## writeWorksheet(wbneu,data,"data")
+  ## saveWorkbook(wbneu)
+
+  wb <- loadWorkbook("match2.xlsx")
+  match <- readWorksheet(wb,1)
+
+  for(i in c(1,2,4,5)){
+      match[,i] <- tolower(match[,i])}
+
+
+  names(match) <- c("name1","vorname1","diabdat","name2","vorname2","gruppe")
+
+  match1 <- match[,c(1,2,3,6)]
+  match1$diabetes <- "ja"
+
+  match$dummy <- NA
+  match2 <- match[,c(4,5,7,6)]
+  match2$diabetes <- "nein"
+
+
+  names(match2) <- names(match1)
+  match <- rbind(match1,match2)
+
+  data <- merge(match,data,by.x = c("name1","vorname1"),by.y = c("name","vorname"),all=T)
+
+
+  data <- data[order(data$vorname,data$name,data$year,data$week),]
+
+
+  wbneu <- loadWorkbook("201503daten.xlsx",create=T)
+  createSheet(wbneu,"data2")
+  writeWorksheet(wbneu,data,"data2")
+  saveWorkbook(wbneu)
+
+
+  data$diabetes[is.na(data$diabetes)] <- "nein"
+  data$gebdat[is.na(data$gebdat)] <- data$GebDat[is.na(data$gebdat)] + days(1)
+  data$messdatum <- data$lufudatum
+  data$messdatum[is.na(data$messdatum)] <- as.Date(data$Datum)[is.na(data$messdatum)]
+
+  data$age <- as.numeric(data$messdatum - data$gebdat)/365.25
+
+  data$id <- factor(paste0("ID",as.numeric(factor(paste(data$name1,data$vorname1)))))
+
+
+  ## save(data,file="201503mergeddata.rdata")
+
+  sum(is.na(data$patnrmd) & !is.na(data$Personennr))
+
+#+END_SRC
+
+* graphiken
+#+BEGIN_SRC R :session
+  load("201503mergeddata.rdata")
+  
+  require(ggplot2)
+  
+  ggplot(data[!is.na(data$gruppe) & !is.na(data$BMI.SDS) & data$age < 18,],aes(x=age,y=BMI.SDS)) +
+  ##    geom_smooth(aes(linetype=diabetes),method="lm") +
+      geom_point() +
+          geom_line(aes(group=id),alpha=0.3) +
+              geom_smooth(aes(group=id,colour=diabetes),method="lm",se=F)
+  
+#+END_SRC
+* [2015-05-05 Di] analysen
+** Grafiken height, weight, bmi
+#+BEGIN_SRC R :session
+  setwd("/media/mvogel/Volume/transcend/doktoranden/steighardt/neu/")
+  load("201503mergeddata.rdata")
+    
+  require(dplyr)
+  require(ggplot2)
+  
+  ## as.numeric(data$Datum - data$diabdat)/3600/24/365.25
+  
+  data$diabage <- as.numeric(as.Date(data$diabdat)-data$gebdat)/365.25
+  matched <- data[!is.na(data$gruppe),]
+  
+  
+  matched <- matched %>%
+      group_by(gruppe) %>%
+          mutate(age.d = unique(diabage[!is.na(diabage)]))
+  
+  ## centered age (around diagnose date)
+  matched$age.c <- matched$age - matched$age.d
+  
+  ## differenz zum perfekten Abstand
+  matched$perf <- round(matched$age.c)
+  matched$diff.per <- abs(matched$age.c - matched$perf)
+  
+  ## minimal difference
+  matched <- matched %>%
+      group_by(gebdat,name1,gruppe,perf) %>%
+          mutate(min.diff.per = min(diff.per))
+  
+  
+  ## save(matched,file="201505matched.rdata")
+  
+  oneperyear <- matched[matched$min.diff.per == matched$diff.per,]
+  
+  
+  
+  give.n <- function(x){
+     return(c(y = mean(x), label = length(x)))
+  }
+  
+  ggplot(matched,aes(x=as.factor(perf),y=SDS,fill=diabetes)) +
+      geom_boxplot() +
+      stat_summary(fun.data=give.n,geom="text")
+  
+  ## height sds
+  ggplot(oneperyear[oneperyear$perf > -12 & oneperyear$perf < 8,],
+         aes(x=as.factor(perf),
+             y=SDS,
+             fill=diabetes)) +
+      geom_boxplot() +
+      stat_summary(fun.data=give.n,geom="text",position = position_dodge(width = 0.75)) +
+      scale_fill_manual("Diabetes",values = c("white","gray"),breaks=c("ja","nein"),labels=c("yes","no")) +
+      labs(y="height SDS",x="time relative to point of diagnosis (years)") +
+      geom_hline(yintercept=0) +
+          theme_bw() +
+      theme(
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.position = c(0.15,0.1),
+          legend.direction = "horizontal",
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18)
+          )
+  
+  ggsave("heightsds.png")
+  
+  ## ggplot(matched[matched$perf > -12 & matched$perf < 8,],aes(x=as.factor(perf),y=SDS,fill=diabetes)) +
+  ##     geom_boxplot() +
+  ##     stat_summary(fun.data=give.n,geom="text",position = position_dodge(width = 0.75)) +
+  ##     labs(y="height SDS",x="time relative to point of diagnosis (years)")
+  
+  ## weight sds
+  ggplot(oneperyear[oneperyear$perf > -12 & oneperyear$perf < 8,],
+         aes(x=as.factor(perf),y=SDS.1,fill=diabetes)) +
+      geom_boxplot() +
+      scale_fill_manual("Diabetes",values = c("white","gray"),breaks=c("ja","nein"),labels=c("yes","no")) +
+      stat_summary(fun.data=give.n,geom="text",position = position_dodge(width = 0.75)) +
+      labs(y="weight SDS",x="time relative to point of diagnosis (years)") +
+      geom_hline(yintercept=0) +
+      theme_bw() +
+      theme(
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.position = c(0.15,0.1),
+          legend.direction = "horizontal",
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18)
+          )
+  
+  ggsave("weightsds.png")
+  
+  ## bmi sds
+  ggplot(oneperyear[oneperyear$perf > -12 & oneperyear$perf < 8,],
+         aes(x=as.factor(perf),y=BMI.SDS,fill=diabetes)) +
+      geom_boxplot(notch=F) +
+      scale_fill_manual("Diabetes",values = c("white","gray"),breaks=c("ja","nein"),labels=c("yes","no")) +
+      stat_summary(fun.data=give.n,geom="text",position = position_dodge(width = 0.75)) +
+      labs(y="BMI SDS",x="time relative to point of diagnosis (years)") +
+          geom_hline(yintercept=0) +
+          theme_bw() +
+      theme(
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.position = c(0.15,0.1),
+          legend.direction = "horizontal",
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18)
+          )
+  
+  ggsave("bmisds.png")
+  
+  ggplot(oneperyear[oneperyear$perf > -12 & oneperyear$perf < 8,],
+         aes(x=as.factor(perf),y=FEV1Z,fill=diabetes)) +
+      geom_boxplot(notch=F) +
+      scale_fill_manual("Diabetes",values = c("white","gray"),breaks=c("ja","nein"),labels=c("yes","no")) +
+      stat_summary(fun.data=give.n,geom="text",position = position_dodge(width = 0.75)) +
+      labs(y="BMI SDS",x="time relative to point of diagnosis (years)") +
+          geom_hline(yintercept=0) +
+          theme_bw() +
+      theme(
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.position = c(0.15,0.1),
+          legend.direction = "horizontal",
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18)
+          )
+  
+  ## ggsave("bmisds.png")
+#+END_SRC
+
+** SDS lungenfunktion
+#+BEGIN_SRC R :session
+  require(dplyr)
+
+  setwd("/media/mvogel/Volume/transcend/doktoranden/steighardt/neu/")
+  load("201503mergeddata.rdata")
+
+  ## require(XLConnect)
+  ## wb <- loadWorkbook("201505daten.xlsx",create=T)
+  ## createSheet(wb,"daten")
+  ## writeWorksheet(wb,data,"daten")
+  ## saveWorkbook(wb)
+
+  data$Geschlecht[data$id=="ID120"] <- 1
+
+  data <- data[!data$id %in% paste0("ID",c(76:82,84:89)),]
+
+  data <- data %>% group_by(id) %>% mutate(sex=unique(Geschlecht[!is.na(Geschlecht)]))
+
+  ## geraten --- warte noch auf Antwort per mail
+  data$fev1[data$fev1 > 10 & !is.na(data$fev1)] <- NA
+  data$mef25[data$mef25 > 10 & !is.na(data$mef25)] <- NA
+
+
+  pathlufu <- "/media/mandy/Volume/transcend/lufu/P V.5.8.13/"
+  lookup <- read.table(file=paste0(pathlufu,"/RLookupTable.csv"), header = TRUE, sep = ",")
+
+
+  ## set 2 (African American), 3 (North East Asian), 4 (South East Asian), 5 (Other or Mixed) all
+  ## to 0 (only caucasian)
+  data$afram <- data$neas <- data$seas <- data$om <- 0
+
+  ## agebound
+
+  data$agebound <-  floor(data$age) + floor((data$age - floor(data$age)) * 4)/4
+
+  data$sex <- data$Geschlecht + 1
+
+  data <- merge(data,lookup[lookup$f=="FEV1",],
+                by.x = c("sex","agebound"),
+                by.y = c("sex","agebound"),all.x = T)
+
+
+
+  ln <- function(x){log(x)}
+  L <- function(d){d$q0 + d$q1 * ln(d$age)+ d$l}
+  M <- function(d){exp(d$a0 + d$a1*ln(d$Groesse) + d$a2*ln(d$age) +d$a3*d$afram + d$a4*d$neas + d$a5*d$seas + d$a6*d$om + d$m)}
+  S <- function(d){exp(d$p0 + d$p1*ln(d$age) + d$p2*d$afram + d$p3*d$neas + d$p4*d$seas + d$p5*d$om + d$s)}
+  LLN <-function(L,M,S){exp(ln(1 - 1.645*L*S)/L + ln(M))}
+  Z <- function(obs, L, M, S){(((obs/M)^L)-1) /(L*S)}
+  Pred <- function(obs,M){obs/M*100}
+
+  data$l<- data$l0+(data$l1-data$l0)*(data$age-data$agebound)*4
+  data$m<- data$m0+(data$m1-data$m0)*(data$age-data$agebound)*4
+  data$s<- data$s0+(data$s1-data$s0)*(data$age-data$agebound)*4
+
+  data$FEV1L <- L(data)
+  data$FEV1Pred <- M(data)
+  data$FEV1S <- S(data)
+  data$FEV1LLN <- LLN(data$FEV1L, data$FEV1Pred, data$FEV1S)
+  data$FEV1Z <- Z(data$fev1, data$FEV1L, data$FEV1Pred, data$FEV1S)
+  data$FEV1PercentPred <- Pred(data$fev1, data$FEV1Pred)
+
+  data <- subset(data,select=-c(f,a0,a1,a2,a3,a4,a5,a6,p0,p1,p2,p3,p4,p5,q0,q1,l0,l1,m0,m1,s0,s1,l,m,s))
+
+  ## mef25=fef75
+  data <- merge(data,lookup[lookup$f=="FEF75",],
+                by.x = c("sex","agebound"),
+                by.y = c("sex","agebound"),all.x = T)
+
+
+  data$l<- data$l0+(data$l1-data$l0)*(data$age-data$agebound)*4
+  data$m<- data$m0+(data$m1-data$m0)*(data$age-data$agebound)*4
+  data$s<- data$s0+(data$s1-data$s0)*(data$age-data$agebound)*4
+
+  data$FEF75L <- L(data)
+  data$FEF75Pred <- M(data)
+  data$FEF75S <- S(data)
+  data$FEF75LLN <- LLN(data$FEF75L, data$FEF75Pred, data$FEF75S)
+  data$FEF75Z <- Z(data$mef25, data$FEF75L, data$FEF75Pred, data$FEF75S)
+
+  data <- subset(data,select=-c(f,a0,a1,a2,a3,a4,a5,a6,p0,p1,p2,p3,p4,p5,q0,q1,l0,l1,m0,m1,s0,s1,l,m,s))
+
+  require(ggplot2)
+
+  save(data,file="201505datenmitrefs.rdata")
+
+  ggplot(data,aes(x=diabetes,y=FEF75Z)) + geom_boxplot(notch=T)
+  ggsave("fef75z.png")
+  ggplot(data,aes(x=diabetes,y=FEF75Z)) +
+      geom_boxplot(notch=T) +
+          geom_jitter()
+
+
+
+  ggplot(data,aes(x=diabetes,y=FEV1Z)) + geom_boxplot(notch=T)
+  ggsave("fev1.png")
+
+  ggplot(data,aes(x=diabetes,y=FEV1Z)) +
+      geom_boxplot(notch=T) +
+          geom_jitter()
+#+END_SRC
+
+* [2015-05-19 Di]
+#+BEGIN_SRC R :session
+  setwd("/media/mvogel/Volume/transcend/doktoranden/steighardt/neu/")
+  load("201505datenmitrefs.rdata")
+  
+  ## gematchte
+  data$diabage <- as.numeric(as.Date(data$diabdat)-data$gebdat)/365.25
+  
+  matched <- data[!is.na(data$gruppe),]
+  
+  matched <- matched %>%
+      group_by(gruppe) %>%
+          mutate(age.d = unique(diabage[!is.na(diabage)]))
+  
+  ## centered age (around diagnose date)
+  matched$age.c <- matched$age - matched$age.d
+  
+  ## differenz zum perfekten Abstand
+  matched$perf <- round(matched$age.c)
+  matched$diff.per <- abs(matched$age.c - matched$perf)
+  
+  
+  ggplot(matched,aes(x=diabetes,y=SDS)) +
+      geom_boxplot() +
+      facet_wrap(~gruppe)
+  
+  
+  ggplot(matched,aes(x=age,y=FEV1Z,colour=diabetes)) +
+      geom_point() +
+      geom_line() +
+      facet_wrap(~gruppe)
+  
+  
+  ggplot(matched[!is.na(matched$SDS),],aes(x=age.c,y=SDS,linetype=diabetes)) +
+  #    geom_point() +
+      labs(y="height SDS",x="time relative to point of diagnosis (years)") +
+      geom_text(aes(x=-15,y=2.5,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  ggsave("einzelverlaufegroesse.png")
+  
+  
+  ggplot(matched[!is.na(matched$BMI.SDS),],aes(x=age.c,y=BMI.SDS,linetype=diabetes)) +
+       geom_text(aes(x=-15,y=2.5,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      labs(y="BMI SDS",x="time relative to point of diagnosis (years)") +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  ggsave("einzelverlaufebmi.png")
+  
+  ggplot(matched[!is.na(matched$SDS.1),],aes(x=age.c,y=SDS.1,linetype=diabetes)) +
+       geom_text(aes(x=-15,y=2.5,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      labs(y="weight SDS",x="time relative to point of diagnosis (years)") +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  
+  ggsave("einzelverlaufegewicht.png")
+  
+  ggplot(matched[!is.na(matched$SDS),],aes(x=age.c,y=SDS,colour=diabetes)) +
+      geom_point() +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      facet_wrap(~gruppe)
+  
+  
+  
+  ggplot(matched[!is.na(matched$FEF75Z),],aes(x=age.c,y=FEF75Z,linetype=diabetes)) +
+       geom_text(aes(x=-15,y=2.3,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      labs(y="FEF75 (Z-score)",x="time relative to point of diagnosis (years)") +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  
+  ggsave("einzelverlauffef75.png")
+  
+  
+  ggplot(matched[!is.na(matched$FEV1Z),],aes(x=age.c,y=FEV1Z,linetype=diabetes)) +
+       geom_text(aes(x=-15,y=2.3,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      labs(y="FEV1 (Z-score)",x="time relative to point of diagnosis (years)") +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  
+  ggsave("einzelverlauffev1.png")
+  
+  
+  ggplot(matched[!is.na(matched$FEV1PercentPred),],aes(x=age.c,y=FEV1PercentPred,linetype=diabetes)) +
+       geom_text(aes(x=-15,y=125,label=gruppe),size = 4) +
+      geom_line() +
+      geom_vline(xintercept=0) +
+      labs(y="FEV1 (% predicted)",x="time relative to point of diagnosis (years)") +
+      facet_wrap(~gruppe) +
+      theme_bw() +
+        theme(
+            panel.grid = element_blank(),
+            panel.border = element_blank(),
+            axis.line = element_line(colour = "black"),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.text = element_text(size = 18),
+            legend.title = element_text(size = 18),
+            axis.text = element_text(size = 18),
+            axis.title = element_text(size = 18),
+            strip.background = element_blank(),
+            strip.text = element_blank()
+            )
+  
+  
+  ggsave("einzelverlauffev1percentpred.png")
+#+END_SRC
+* [2015-05-22 Fr] 
+#+BEGIN_SRC R :session
+  setwd("/media/mvogel/Volume/transcend/doktoranden/steighardt/neu/")
+  load("201505matched.rdata")
+  
+  require(dplyr)
+  
+  matched$diabetes <- factor(matched$diabetes,levels=c("nein","ja"))
+  
+  matched <- matched %>% group_by(id) %>% transform(sex=unique(Geschlecht[!is.na(Geschlecht)]))
+  
+  sex.id <- matched %>% group_by(id) %>% summarise(sex=unique(Geschlecht[!is.na(Geschlecht)]),
+                                                   diabetes=unique(diabetes[!is.na(diabetes)]),
+                                                   gruppe=unique(gruppe[!is.na(gruppe)]))
+  
+  # BMI
+  ## fitting pro kind
+  
+  require(ggplot2)
+  
+  ggplot(matched, aes(x=age.c, y=BMI.SDS, colour=diabetes)) +
+      geom_point() +
+      geom_smooth(aes(group=id),se=F,method="lm") +
+      scale_x_continuous(limits=c(-7,7)) +
+      facet_grid(sex ~ .)
+  
+  ### linear model
+  
+  ggplot(matched, aes(x=age.c, y=BMI.SDS, colour=diabetes)) +
+      geom_point() +
+      geom_smooth(aes(group=id),se=F, method="lm") +
+      scale_x_continuous(limits=c(-7,7)) +
+      facet_grid(sex ~ .)
+  
+  # Groesse
+  ggplot(matched, aes(x=age.c, y=SDS, colour=diabetes)) +
+      geom_point() +
+      geom_smooth(aes(group=id),se=F) +
+      scale_x_continuous(limits=c(-7,7)) +
+      facet_grid(sex ~ .)
+  
+  ggplot(matched, aes(x=age.c, y=SDS, colour=diabetes)) +
+      geom_point() +
+      geom_smooth(aes(group=id),se=F, method="lm") +
+      scale_x_continuous(limits=c(-7,7)) +
+      facet_grid(sex ~ .)
+  
+  
+  require(lme4)
+  mm <- lmer(SDS ~ diabetes + age.c + (age.c || id), matched)
+  summary(mm)
+  
+  ## add sex
+  mm.1 <- lmer(SDS ~ diabetes * sex + age.c + (age.c || id), matched)
+  summary(mm.1) ## geschlecht spielt keine rolle
+  
+  anova(mm,mm.1) ## geschlecht spielt keine rolle
+  
+  ## add interaction effect age diabetes
+  mm.2 <- lmer(SDS ~ diabetes * age.c + (age.c || id), matched)
+  summary(mm.2)
+  
+  anova(mm,mm.2) 
+  
+  
+  ## ohne interaction term
+  coef(mm)
+  
+  persmod <- coef(mm)$id
+  names(persmod)[1] <- "intercept"
+  persmod$id <- rownames(persmod)
+  
+  persmod <- merge(persmod,sex.id)
+  persmod$intercept2 <- persmod$intercept + (persmod$diabetes == "ja") * persmod$diabetesja
+  
+  persmod
+  
+  ggplot(persmod,aes(y=intercept2,x=0,colour=diabetes)) +
+      geom_point() +
+      geom_abline(aes(intercept=intercept, slope=age.c,colour=diabetes)) +
+      scale_color_manual(values = c("blue","red")) + 
+      scale_x_continuous(limits=c(-7,7)) +
+      geom_abline(intercept=fixef(mm)[1],slope=fixef(mm)[3],colour="blue",size=3) +
+      geom_abline(intercept=fixef(mm)[1] + fixef(mm)[2],slope=fixef(mm)[3],colour="red",size=3)
+  
+  
+  anova(mm)
+  
+  ## mit interaction term
+  
+  coef(mm.2)
+  
+  persmod <- coef(mm.2)$id
+  names(persmod)[1] <- "intercept"
+  persmod$id <- rownames(persmod)
+  
+  names(persmod)[4] <- "interaction"
+  
+  persmod <- merge(persmod,sex.id)
+  persmod$intercept2 <- persmod$intercept + (persmod$diabetes == "ja") * persmod$diabetesja
+  persmod$age.c2 <- persmod$age.c + (persmod$diabetes == "ja") * persmod$interaction
+  
+  persmod
+  
+  ggplot(persmod,aes(y=intercept2,x=0,colour=diabetes)) +
+      geom_point(size=0) +
+  ##    geom_point(inherit.eas=F, data=matched, aes(x=age.c, y=SDS) ) +
+      geom_abline(aes(intercept=intercept2, slope=age.c2,colour=diabetes),size=0.1) +
+      scale_color_manual(values = c("blue","red")) +
+      guides(color = guide_legend(override.aes= list(size = 2))) +
+      scale_x_continuous(limits=c(-7,7)) +
+      scale_y_continuous(limits=c(-4,2)) +
+      geom_abline(intercept=fixef(mm.2)[1],
+                  slope=fixef(mm.2)[3],colour="blue",size=3) +
+      geom_abline(intercept=fixef(mm.2)[1] + fixef(mm.2)[2],
+                  slope=fixef(mm.2)[3] + fixef(mm.2)[4],colour="red",size=3) 
+  
+  
+  
+  ## getrennt vor und nach manifestation ## groesse
+  ## mit interaction term
+  
+  ## bis 1 Jahr vor Diagnose
+  
+  mm.3 <- lmer(SDS ~ diabetes * age.c + (age.c || id), matched[matched$age.c < -1,])
+  summary(mm.3)
+  
+  coef(mm.3)
+  anstieg1 <- fixef(mm.3)[3]
+  anstieg2 <- sum(fixef(mm.3)[3:4])
+  
+  intcept1 <- fixef(mm.3)[1]
+  intcept2 <- sum(fixef(mm.3)[1:2])
+  
+  pkya1 <- intcept1 - 8 * anstieg1
+  pkya2 <- intcept2 - 8 * anstieg2
+  
+  pkye1 <- intcept1 - anstieg1
+  pkye2 <- intcept2 - anstieg2
+  
+  
+  mm.4 <- lmer(SDS ~ diabetes * age.c + (age.c || id), matched[matched$age.c > 0.25,])
+  summary(mm.4)
+  
+  coef(mm.4)
+  
+  anstieg3 <- fixef(mm.4)[3]
+  anstieg4 <- sum(fixef(mm.4)[3:4])
+  
+  intcept3 <- fixef(mm.4)[1]
+  intcept4 <- sum(fixef(mm.4)[1:2])
+  
+  pkya3 <- intcept3 + 0.25 * anstieg3
+  pkya4 <- intcept4 + 0.25 * anstieg4
+  
+  pkye3 <- intcept3 + 8 * anstieg3
+  pkye4 <- intcept4 + 8 * anstieg4
+  
+  require(gridExtra)
+  
+  ggplot(persmod3,aes(y=intercept2,x=0,linetype=diabetes)) +
+      geom_point(size=0) +
+      geom_line(size=0) +
+      geom_segment(inherit.aes=F,x=-8,xend=-1,y=pkya1,yend=pkye1,size=2,linetype = 1) +
+      geom_segment(inherit.aes=F,x=-8,xend=-1,y=pkya2,yend=pkye2,size=2,linetype = 2) +
+      geom_segment(inherit.aes=F,x=0.25,xend=8,y=pkya3,yend=pkye3,size=2,linetype = 1) +
+      geom_segment(inherit.aes=F,x=0.25,xend=8,y=pkya4,yend=pkye4,size=2,linetype = 2) +         
+      scale_x_continuous(limits=c(-8,8)) +
+      scale_y_continuous(limits=c(-2,1)) +
+       labs(y="height SDS",x="time relative to point of diagnosis (years)") +
+      guides(linetype = guide_legend("Diabetes",override.aes = list(size = 2))) +
+      theme_bw() +
+      theme(
+          legend.position = c(0.2,0.1),
+          legend.key.width = unit(2,"cm"),
+          legend.direction = "horizontal",
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18),
+          strip.background = element_blank(),
+          strip.text = element_blank()
+   )
+  
+  
+  ggsave("mixedmodelheightsds.png")
+  
+  
+  ## getrennt vor und nach manifestation ## bmi 
+  ## mit interaction term
+  
+  ## bis 1 Jahr vor Diagnose
+  
+  mm.3 <- lmer(BMI.SDS ~ diabetes * age.c + (age.c || id), matched[matched$age.c < -1,])
+  summary(mm.3)
+  
+  coef(mm.3)
+  anstieg1 <- fixef(mm.3)[3]
+  anstieg2 <- sum(fixef(mm.3)[3:4])
+  
+  intcept1 <- fixef(mm.3)[1]
+  intcept2 <- sum(fixef(mm.3)[1:2])
+  
+  pkya1 <- intcept1 - 8 * anstieg1
+  pkya2 <- intcept2 - 8 * anstieg2
+  
+  pkye1 <- intcept1 - anstieg1
+  pkye2 <- intcept2 - anstieg2
+  
+  
+  mm.4 <- lmer(BMI.SDS ~ diabetes * age.c + (age.c || id), matched[matched$age.c > 0.25,])
+  summary(mm.4)
+  
+  coef(mm.4)
+  
+  anstieg3 <- fixef(mm.4)[3]
+  anstieg4 <- sum(fixef(mm.4)[3:4])
+  
+  intcept3 <- fixef(mm.4)[1]
+  intcept4 <- sum(fixef(mm.4)[1:2])
+  
+  pkya3 <- intcept3 + 0.25 * anstieg3
+  pkya4 <- intcept4 + 0.25 * anstieg4
+  
+  pkye3 <- intcept3 + 8 * anstieg3
+  pkye4 <- intcept4 + 8 * anstieg4
+  
+  require(gridExtra)
+  
+  ggplot(persmod3,aes(y=intercept2,x=0,linetype=diabetes)) +
+      geom_point(size=0) +
+      geom_line(size=0) +
+      geom_segment(inherit.aes=F,x=-8,xend=-1,y=pkya1,yend=pkye1,size=2,linetype = 1) +
+      geom_segment(inherit.aes=F,x=-8,xend=-1,y=pkya2,yend=pkye2,size=2,linetype = 2) +
+      geom_segment(inherit.aes=F,x=0.25,xend=8,y=pkya3,yend=pkye3,size=2,linetype = 1) +
+      geom_segment(inherit.aes=F,x=0.25,xend=8,y=pkya4,yend=pkye4,size=2,linetype = 2) +         
+      scale_x_continuous(limits=c(-8,8)) +
+      scale_y_continuous(limits=c(-2,1)) +
+       labs(y="BMI SDS",x="time relative to point of diagnosis (years)") +
+      guides(linetype = guide_legend("Diabetes",override.aes = list(size = 2))) +
+      theme_bw() +
+      theme(
+          legend.position = c(0.2,0.1),
+          legend.key.width = unit(2,"cm"),
+          legend.direction = "horizontal",
+          panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 18),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18),
+          strip.background = element_blank(),
+          strip.text = element_blank()
+   )
+  
+  
+  ggsave("mixedmodelbmisds.png")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  persmod3 <- coef(mm.3)$id
+  names(persmod3)[1] <- "intercept"
+  persmod3$id <- rownames(persmod3)
+  names(persmod3)[4] <- "interaction"
+  
+  persmod3 <- merge(persmod3,sex.id)
+  persmod3$intercept2 <- persmod3$intercept + (persmod3$diabetes == "ja") * persmod3$diabetesja
+  persmod3$age.c2 <- persmod3$age.c + (persmod3$diabetes == "ja") * persmod3$interaction
+  
+  persmod3
+  
+  
+  persmod4 <- coef(mm.3)$id
+  names(persmod4)[1] <- "intercept"
+  persmod4$id <- rownames(persmod4)
+  names(persmod4)[4] <- "interaction"
+  
+  persmod4 <- merge(persmod4,sex.id)
+  persmod4$intercept2 <- persmod4$intercept + (persmod4$diabetes == "ja") * persmod4$diabetesja
+  persmod4$age.c2 <- persmod4$age.c + (persmod4$diabetes == "ja") * persmod4$interaction
+  
+  persmod4
+  
+  
+  ggplot(persmod3,aes(y=intercept2,x=0,colour=diabetes)) +
+      geom_point(size=0) +
+  ##    geom_point(inherit.eas=F, data=matched, aes(x=age.c, y=SDS) ) +
+      geom_abline(aes(intercept=intercept2, slope=age.c2,colour=diabetes),size=0.1) +
+      scale_color_manual(values = c("blue","red")) +
+      guides(color = guide_legend(override.aes= list(size = 2))) +
+      scale_x_continuous(limits=c(-7,7)) +
+      scale_y_continuous(limits=c(-4,2)) +
+      geom_abline(intercept=fixef(mm.3)[1],
+                  slope=fixef(mm.3)[3],colour="blue",size=3) +
+      geom_abline(intercept=fixef(mm.3)[1] + fixef(mm.3)[2],
+                  slope=fixef(mm.3)[3] + fixef(mm.3)[4],colour="red",size=3) 
+  
+  
+  ggplot(persmod4,aes(y=intercept2,x=0,colour=diabetes)) +
+      geom_point(size=0) +
+  ##    geom_point(inherit.eas=F, data=matched, aes(x=age.c, y=SDS) ) +
+      geom_abline(aes(intercept=intercept2, slope=age.c2,colour=diabetes),size=0.1) +
+      scale_color_manual(values = c("blue","red")) +
+      guides(color = guide_legend(override.aes= list(size = 2))) +
+      scale_x_continuous(limits=c(-7,7)) +
+      scale_y_continuous(limits=c(-4,2)) +
+      geom_abline(intercept=fixef(mm.4)[1],
+                  slope=fixef(mm.4)[3],colour="blue",size=4) +
+      geom_abline(intercept=fixef(mm.4)[1] + fixef(mm.2)[2],
+                  slope=fixef(mm.4)[3] + fixef(mm.3)[4],colour="red",size=4) 
+    
+#+END_SRC
+
+#+BEGIN_SRC R :session
+  setwd("/media/mandy/Volume/transcend/doktoranden/steighardt/neu/")
+  tt <- load("201505datenmitrefs.rdata")
+
+  data$diabetes <- factor(data$diabetes,levels=c("nein","ja"))
+
+  plot(data$age,data$SDS)
+
+  sex.id <- data %>%
+      group_by(id) %>%
+      summarise(sex=unique(Geschlecht[!is.na(Geschlecht)]),
+                diabetes=unique(diabetes[!is.na(diabetes)]))
+
+  require(lme4)
+  mm <- lmer(SDS ~ age * diabetes + (1|id),data)
+  mm <- lmer(SDS ~ age * diabetes + (1 + age|id) ,data)
+
+
+  persmod <- coef(mm)$id
+  names(persmod)[1] <- "intercept"
+  names(persmod)[4] <- "interactionagediabetes"
+
+  persmod$id <- rownames(persmod)
+
+  persmod <- merge(persmod,sex.id)
+
+  persmod$intercept2 <- persmod$intercept + (persmod$diabetes == "ja") * persmod$diabetesja
+
+  persmod$age2 <- persmod$age + (persmod$diabetes == "ja") * persmod$interactionagediabetes
+
+  ggplot(persmod,aes(y=intercept2,x=0,colour=diabetes)) +
+      geom_point(alpha=0) +
+      geom_abline(aes(intercept=intercept, slope=age,colour=diabetes,alpha=0.01)) +
+      scale_color_manual(values = c("blue","red")) + 
+      scale_x_continuous(limits=c(0,18)) +
+      scale_y_continuous(limits=c(-4,4)) +
+      geom_abline(intercept=fixef(mm)[1],slope=fixef(mm)[2],colour="blue",size=3) +
+      geom_abline(intercept=fixef(mm)[1] + fixef(mm)[3],
+                  slope=fixef(mm)[2] + fixef(mm)[4],colour="red",size=3)
+#+END_SRC
